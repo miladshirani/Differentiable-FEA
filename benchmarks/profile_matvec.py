@@ -102,14 +102,20 @@ def min_traffic_bytes(params):
 def profile_table(fn, device, top=10):
     """Run ``fn`` under torch.profiler and return the ``top`` operators by self time as dict rows."""
     from torch.profiler import profile, ProfilerActivity
-    acts = [ProfilerActivity.CPU] + ([ProfilerActivity.CUDA] if str(device).startswith("cuda") else [])
+    on_gpu = str(device).startswith("cuda")
+    acts = [ProfilerActivity.CPU] + ([ProfilerActivity.CUDA] if on_gpu else [])
     fn(); sync(device)
     with profile(activities=acts) as prof:
         for _ in range(3):
             fn()
         sync(device)
-    key = "self_cuda_time_total" if str(device).startswith("cuda") else "self_cpu_time_total"
-    events = [e for e in prof.key_averages() if getattr(e, key) > 0]
+    events = list(prof.key_averages())
+    # PyTorch renamed the per-event device time: self_cuda_time_total (older) -> self_device_time_total (newer)
+    candidates = ["self_device_time_total", "self_cuda_time_total"] if on_gpu else ["self_cpu_time_total"]
+    key = next((k for k in candidates if events and hasattr(events[0], k)), None)
+    if key is None:
+        raise RuntimeError(f"profiler events have none of the attributes {candidates}")
+    events = [e for e in events if getattr(e, key) > 0]
     total = sum(getattr(e, key) for e in events)
     events.sort(key=lambda e: getattr(e, key), reverse=True)
     return [dict(op=e.key, calls=e.count // 3, percent=100.0 * getattr(e, key) / total,
@@ -182,8 +188,6 @@ def main():
     out["fraction_of_bandwidth_qp"] = t_ideal / t["A(v) stored Gauss-point tangent (qp)"]
     out["qp_storage_MB"] = n_el * params["dN_dX"].shape[1] * 16 * 8 / 2 ** 20
 
-    out["profile_A_v_top_ops"] = profile_table(lambda: A(v), dev)
-
     # ---- print ----------------------------------------------------------------------------------
     print("\n--- wall time (median of runs) ---")
     for k, x in t.items():
@@ -198,15 +202,28 @@ def main():
           f"fraction of that reached: jvp {100 * out['fraction_of_bandwidth_current']:.2f} %, "
           f"linearize {100 * out['fraction_of_bandwidth_linearize']:.2f} %, "
           f"qp {100 * out['fraction_of_bandwidth_qp']:.2f} % (stores {out['qp_storage_MB']:.0f} MB)")
-    print("\n--- torch.profiler, top operators of A(v) (self time) ---")
-    for r in out["profile_A_v_top_ops"]:
-        print(f"{r['percent']:6.1f} %  {r['ms_per_call_total']:9.2f} ms  x{r['calls']:<4d} {r['op']}")
-
     os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
     path = os.path.join(HERE, "results", f"profile_{dev.split(':')[0]}_{args.element_type}.json")
-    with open(path, "w") as fh:
-        json.dump(out, fh, indent=2)
+
+    def save():
+        with open(path, "w") as fh:
+            json.dump(out, fh, indent=2)
+
+    save()                                  # the timings are safe on disk before the profiler (which can fail) runs
+
+    # ---- operator-level profile (last: it depends on the PyTorch version) -------------------------
+    print("\n--- torch.profiler, top operators of A(v) (self time) ---")
+    try:
+        out["profile_A_v_top_ops"] = profile_table(lambda: A(v), dev)
+        for r in out["profile_A_v_top_ops"]:
+            print(f"{r['percent']:6.1f} %  {r['ms_per_call_total']:9.2f} ms  x{r['calls']:<4d} {r['op']}")
+    except Exception as exc:                # noqa: BLE001 -- report and keep the measurements
+        out["profile_error"] = f"{type(exc).__name__}: {exc}"
+        print("profiler failed (timings above are still valid):", out["profile_error"])
+    save()
     print("\nwrote", os.path.relpath(path, os.path.dirname(HERE)))
+    print("\nJSON (copy this block when reporting results):")
+    print(json.dumps(out))
 
 
 if __name__ == "__main__":
