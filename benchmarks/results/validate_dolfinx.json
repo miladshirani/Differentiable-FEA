@@ -1,0 +1,88 @@
+{
+  "difffea": "0.1.0.dev0",
+  "torch": "2.14.1",
+  "dolfinx": "0.11.0",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "python": "3.12.11",
+  "n_load_steps": 3,
+  "cases": [
+    {
+      "case": "plate_hole/tri3",
+      "geometry": "plate_hole",
+      "element_type": "tri3",
+      "h": 0.25,
+      "n_nodes": 207,
+      "n_elements": 354,
+      "max_u": 0.29109003855758814,
+      "rel_err_u": 8.115033736667918e-16,
+      "rel_err_energy": 0.0,
+      "rel_err_reaction": 1.243449787580175e-16,
+      "dolfinx_newton_iterations": 12
+    },
+    {
+      "case": "plate_hole/tri6",
+      "geometry": "plate_hole",
+      "element_type": "tri6",
+      "h": 0.4,
+      "n_nodes": 330,
+      "n_elements": 146,
+      "max_u": 0.29681241171172573,
+      "rel_err_u": 8.829887579132606e-14,
+      "rel_err_energy": 1.6190983919315475e-14,
+      "rel_err_reaction": 3.6983801654612696e-14,
+      "dolfinx_newton_iterations": 12
+    },
+    {
+      "case": "plate_hole/quad4",
+      "geometry": "plate_hole",
+      "element_type": "quad4",
+      "h": 0.25,
+      "n_nodes": 248,
+      "n_elements": 212,
+      "max_u": 0.2951114681006843,
+      "rel_err_u": 2.4241686237986507e-14,
+      "rel_err_energy": 4.776332594601105e-15,
+      "rel_err_reaction": 1.3872562203242095e-14,
+      "dolfinx_newton_iterations": 12
+    },
+    {
+      "case": "plate_hole/quad9",
+      "geometry": "plate_hole",
+      "element_type": "quad9",
+      "h": 0.4,
+      "n_nodes": 512,
+      "n_elements": 116,
+      "max_u": 0.2973408408598688,
+      "rel_err_u": 2.1352895564949724e-15,
+      "rel_err_energy": 3.6480591534524e-16,
+      "rel_err_reaction": 4.2210089531393216e-16,
+      "dolfinx_newton_iterations": 12
+    },
+    {
+      "case": "rectangle/quad4",
+      "geometry": "rectangle",
+      "element_type": "quad4",
+      "h": 0.25,
+      "n_nodes": 45,
+      "n_elements": 32,
+      "max_u": 0.5168860494403356,
+      "rel_err_u": 4.295813461505736e-16,
+      "rel_err_energy": 3.1383715969835196e-15,
+      "rel_err_reaction": 4.455080288318128e-15,
+      "dolfinx_newton_iterations": 18
+    },
+    {
+      "case": "rectangle/tri6",
+      "geometry": "rectangle",
+      "element_type": "tri6",
+      "h": 0.5,
+      "n_nodes": 45,
+      "n_elements": 16,
+      "max_u": 0.5321248641215832,
+      "rel_err_u": 3.818104118133858e-14,
+      "rel_err_energy": 7.732760752865247e-15,
+      "rel_err_reaction": 1.8859522924667253e-14,
+      "dolfinx_newton_iterations": 20
+    }
+  ]
+}

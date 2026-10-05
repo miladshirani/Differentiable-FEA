@@ -24,7 +24,20 @@ reproducible tool for high-performance computing: GPUs first, then distributed m
 | Preconditioners | Jacobi, nodal block-Jacobi (matrix-free); ILU of the assembled tangent (CPU only) |
 | Sensitivities | exact adjoint gradients (implicit function theorem), no assembled matrix |
 | GUI | Streamlit app (`app/streamlit_app.py`) with live residual monitor |
-| Tests | finite-strain patch test for every element, rigid-body invariance, operator symmetry/SPD, adjoint vs finite differences, material checks; notebook safety scan |
+| Tests | agreement with dolfinx, analytic reference solutions, finite-strain patch test for every element, rigid-body invariance, operator symmetry/SPD, adjoint vs finite differences, material checks; notebook safety scan |
+
+## Validation (measured)
+
+| Check | Result | Reproduce |
+|---|---|---|
+| **Identical discrete problem vs FEniCSx/dolfinx 0.11.0** (same mesh, neo-Hookean energy, Gauss rule, clamp + dead load, 3 load steps; plate with hole and cantilever; Tri3, Tri6, Q4, Q9) | displacement, strain energy and reaction agree to about 1e-13 relative (worst case 9e-14); a deliberate 0.1 % change of the reference material shows up as 1.7e-4, so the comparison is sensitive | `benchmarks/validate_against_dolfinx.py` -> `benchmarks/results/validate_dolfinx.json` |
+| Cantilever vs Timoshenko beam theory (plane strain, small load) | Q8, Q9, Tri6 within 1 % (about 0.4 % below beam theory); Q4 shows the expected shear locking and converges with refinement | `tests/test_analytic.py` |
+| Plate with hole vs Heywood's finite-width Kirsch formula | peak stress at the hole within 3 %; Tri6 approaches from below, Q9 from above | `tests/test_analytic.py` |
+
+What this does **not** show: it compares identical discretisations, so it validates the implementation but not
+discretisation error or performance, and only one problem family (neo-Hookean, clamp plus traction) was compared.
+The tolerances of the analytic tests were set after looking at the measured values, so they document the
+current accuracy rather than predict it independently.
 
 ## Design rules
 

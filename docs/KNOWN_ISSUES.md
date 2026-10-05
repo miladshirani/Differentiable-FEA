@@ -14,3 +14,7 @@
 6. Streamlit caches imported modules: restart the server after editing the library.
 7. Plane strain only, displacement-only formulation (volumetric locking as ν → 0.5), dead loads, no plasticity.
 8. CI workflow (`.github/workflows/ci.yml`) has not run yet; gmsh on the Linux runner is untested.
+9. Q4 (full 2x2 integration) shows shear locking in bending (measured: tip deflection 4 % too small at 4 elements
+   per beam height). Use quadratic elements, or a future B-bar/F-bar formulation.
+10. The dolfinx comparison covers Tri3, Tri6, Q4 and Q9 only (dolfinx has no 8-node serendipity geometry), a
+    clamp-plus-traction load and the neo-Hookean material. Other materials and boundary conditions are untested against it.
