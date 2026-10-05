@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "difffea"
+version = "0.1.0.dev0"
+description = "Differentiable, matrix-free finite element analysis (large-strain hyperelasticity) in purely functional PyTorch."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+keywords = ["finite element", "differentiable programming", "matrix-free", "PyTorch", "hyperelasticity", "HPC"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Scientific/Engineering",
+]
+# Lower bounds only here (what the code needs); exact, tested versions live in requirements-lock.txt.
+dependencies = [
+    "torch>=2.2",
+    "numpy",
+    "scipy",          # ILU preconditioner
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+mesh = ["gmsh"]                     # unstructured meshes (structured rectangle meshes need no mesher)
+app  = ["streamlit", "pandas"]      # the GUI
+dev  = ["pytest", "pandas"]
+all  = ["gmsh", "streamlit", "pandas", "pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore:.*torch.jit.script.*"]

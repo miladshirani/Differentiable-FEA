@@ -1,43 +1,80 @@
 # Differentiable-FEA
 
-A hands-on guide to building a finite element method (FEA) solver for large-deformation hyperelastic materials from scratch, using automatic differentiation. This repository walks through setting up FEA for hyperelasticity in parallel using two of the most popular Python autodiff frameworks — **JAX** and **PyTorch** — so you can see both how the method works and how the same ideas are expressed differently across frameworks.
+Differentiable, **matrix-free** finite element analysis for large-strain hyperelasticity, written in
+purely functional PyTorch (`torch.func`: `grad`, `jvp`, `vjp`, `vmap`, `jacfwd`). The goal is an open,
+reproducible tool for high-performance computing: GPUs first, then distributed memory.
 
-Rather than hand-deriving the stress-strain relation and its tangent (the standard approach, and a common source of bugs in classical FEA codes), every derivative here — shape function gradients, the deformation gradient, the Piola stress, and the consistent tangent stiffness for Newton-Raphson — is computed exactly via autodiff. The goal is to make the mechanics *and* the autodiff mechanics both transparent, one building block at a time.
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/miladshirani/Differentiable-FEA/blob/main/notebooks/colab_gpu.ipynb)
 
-## Why autodiff for FEA?
+> **Status: early development (v0.1.0.dev0).** Today this is a verified **2D, single-process, CPU, float64**
+> solver. It is **not yet an HPC code**: the GPU path has not been run on a real GPU, there is no
+> distributed-memory support, no scalable preconditioner and no comparison against an established code.
+> See [docs/ROADMAP.md](docs/ROADMAP.md) for what is planned and [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md)
+> for what is known to be broken or unverified. Performance numbers will appear here only when a script in
+> `benchmarks/` produced them.
 
-In a standard FEA implementation, the constitutive stress-strain relation and its tangent (needed for Newton-Raphson) are derived by hand — a tedious and error-prone step, especially for nonlinear material models. Here, the strain energy density is the only thing defined explicitly; the stress (`∂ψ/∂F`) and tangent stiffness (`∂²ψ/∂F²`) fall out automatically and exactly, with no hand-derived formulas to get wrong.
+## What works today
 
-## Current Features
+| | |
+|---|---|
+| Elements | Q4, Q8 (serendipity), Q9, Tri3, Tri6 from one element library |
+| Geometries | structured rectangle (no mesher needed); rectangle, L-bracket, plate with hole, notched plate via Gmsh |
+| Materials | neo-Hookean, Mooney–Rivlin, Saint Venant–Kirchhoff, Demiray, fibre-reinforced HGO; a new model is one energy function |
+| Solver | matrix-free inexact Newton–Krylov: PCG on `jvp` products, Eisenstat–Walker forcing, Armijo line search, adaptive load stepping |
+| Preconditioners | Jacobi, nodal block-Jacobi (matrix-free); ILU of the assembled tangent (CPU only) |
+| Sensitivities | exact adjoint gradients (implicit function theorem), no assembled matrix |
+| GUI | Streamlit app (`app/streamlit_app.py`) with live residual monitor |
+| Tests | finite-strain patch test for every element, rigid-body invariance, operator symmetry/SPD, adjoint vs finite differences, material checks; notebook safety scan |
 
-- **Constitutive model:** Compressible neo-Hookean hyperelasticity, with stress obtained via `jax.grad` of the strain energy
-- **Elements:** Tri3, Tri6, Quad4, Quad8, Quad9 (isoparametric shape functions, gradients via `jax.jacfwd`)
-- **Integration:** Gauss-Legendre quadrature (1D and 2D, arbitrary order)
-- **Kinematics:** Isoparametric interpolation, mesh Jacobian, and both local (reference-element) and global (physical) deformation gradient computed via autodiff through the interpolated displacement field
-- **Weak form:** Local and globally-integrated internal virtual work assembly, vectorized over Gauss points with `jax.vmap`
+## Design rules
 
-## Roadmap
+* **Functional, no classes** in the numerical code: state lives in plain dictionaries (`spec` → `params` → `fields`),
+  linear operators are closures `v -> A(v)`.
+* Per-element work is written for one element and mapped with `vmap`; local–global coupling is one gather and
+  one `index_add_`; Dirichlet conditions use masks and `torch.where`.
+* Derivatives (stress, tangent products, adjoints) come from automatic differentiation, never from hand-derived formulas.
 
-- [ ] Newton-Raphson solver, with the tangent stiffness matrix obtained via `jax.jacfwd`/`jax.jacrev` on the assembled residual
-- [ ] Dynamic Relaxation solver (explicit, matrix-free — robust through buckling/snap-through where Newton-Raphson struggles)
-- [ ] Global assembly across a mesh (current code operates at the single-element level)
-- [ ] Boundary conditions and load stepping
-- [ ] Parallel PyTorch implementation
-- [ ] Example problems and convergence/robustness comparison between solvers
+## Install and quick start
 
-## Project Structure
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[all]"          # or: pip install -r requirements-lock.txt && pip install -e . --no-deps
+python examples/quickstart.py
+python -m pytest -q
+streamlit run app/streamlit_app.py
+```
+
+```python
+import torch
+from difffea.problem import default_spec, build_problem
+from difffea.newton_krylov import newton_krylov_solve
+from difffea.postprocess import compute_fields
+
+params = build_problem(default_spec("plate_hole", element_type="tri6", h=0.2))
+theta = torch.ones(params["conn"].shape[0], dtype=torch.float64)
+u, info = newton_krylov_solve(params, theta, n_load_steps=3, tol=1e-5)
+fields = compute_fields(u, theta, params)       # stresses, J, energy, ...
+```
+
+## Google Colab
+
+`notebooks/colab_gpu.ipynb` runs the code on Colab's free GPU. It asks for nothing beyond running the
+code: no Google Drive, no authentication, no Colab Secrets, no public tunnel. It fetches this repository at a
+**pinned commit** and installs only version-pinned packages; `tests/test_notebook_safety.py` (run by CI) scans
+every notebook for forbidden patterns. The repository can promise that about the notebook only — it cannot
+promise anything about Colab itself. The GPU path is still **unverified** on real hardware.
+
+## Layout
 
 ```
-neo-Hookean/
-└── scr/
-    ├── constitutive_relations.py   # Strain energy density and Piola stress (via autodiff)
-    ├── shape_functions_2D.py       # Tri3/6, Quad4/8/9 isoparametric shape functions
-    ├── Grad_shape_functions_2D.py  # Shape function gradients (via autodiff)
-    ├── Gauss_Quadratures.py        # 1D/2D Gauss-Legendre quadrature rules
-    ├── Kinematics.py               # Interpolation, mesh Jacobian, deformation gradient
-    └── Weak_Form.py                # Local/global weak form assembly
+src/difffea/   the library (elements, kinematics, materials, operators, newton_krylov, ...)
+tests/         pytest suite (+ notebook safety scan)
+examples/      quickstart and benchmarks of the predecessor project
+app/           Streamlit GUI
+notebooks/     Colab notebook
+docs/          roadmap, known issues, figures
 ```
 
-## Author
+## License
 
-Milad Shirani — Postdoc, Yale University (PhD, UC Berkeley), computational mechanics.
+Apache-2.0, see [LICENSE](LICENSE). This project builds on an earlier, private learning project by the same author.

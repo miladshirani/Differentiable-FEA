@@ -1,5 +1,5 @@
 """
-Kinematics.py
+kinematics.py
 =============
 
 Geometry and deformation of ONE element, all built from the shape functions.

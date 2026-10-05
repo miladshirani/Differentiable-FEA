@@ -1,5 +1,5 @@
 """
-Weak_Form.py
+weak_form.py
 ============
 
 The WEAK FORM (principle of virtual work) of finite-strain elasticity.
@@ -14,14 +14,14 @@ the integrand at ONE Gauss point and then sum it over the quadrature rule of
 ONE element.
 
 Design rule: every function works on one point / one element with fixed shapes;
-``vmap`` supplies the loops (see Operators.py).
+``vmap`` supplies the loops (see operators.py).
 """
 
 import torch
 from torch.func import vmap
 
-from scr.Constitutive_Relations import Piola_Stress
-from scr.Kinematics import Local_Deformation_Gradient, Global_Deformation_Gradient
+from difffea.constitutive_relations import Piola_Stress
+from difffea.kinematics import Local_Deformation_Gradient, Global_Deformation_Gradient
 
 
 # =============================================================================
@@ -87,7 +87,7 @@ def Global_Virtual_Work(u_fn, v_fn, X_fn, mu, lmbda, xi, eta):
     Note the TRIAL field u enters through the stress, the VIRTUAL field v only
     through its gradient.  dW is LINEAR in v: that single fact lets us recover
     the element force vector by differentiating with respect to v (see
-    ``elem_residual`` in Operators.py).
+    ``elem_residual`` in operators.py).
 
     Parameters
     ----------

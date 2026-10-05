@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ipynb_checkpoints/
+# macOS / editors
+.DS_Store
+.vscode/
+# private hand-off notes and book (kept outside the public repo)
+PROJECT_SUMMARY.md
+Book/
+Teaching_Style.md
+# benchmark scratch output (committed results go in benchmarks/results/)
+benchmarks/scratch/

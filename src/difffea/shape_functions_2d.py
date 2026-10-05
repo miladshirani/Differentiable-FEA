@@ -1,5 +1,5 @@
 """
-shape_functions_2D.py
+shape_functions_2d.py
 =====================
 
 Lagrange / serendipity SHAPE FUNCTIONS on the reference elements.
@@ -13,7 +13,7 @@ It equals 1 at its own node, 0 at every other node, and the N_a always sum to 1
 Every function here takes the two SCALAR reference coordinates (xi, eta)
 and returns a vector ``(n_nodes,)`` holding N_1 ... N_n at that point.
 They are written for ONE point on purpose: derivatives come from autograd
-(see Grad_shape_functions_2D.py) and loops over points come from ``vmap``.
+(see grad_shape_functions_2d.py) and loops over points come from ``vmap``.
 
 Reference domains
 -----------------
@@ -56,7 +56,7 @@ def shape_fn_1d_quadratic(s: torch.Tensor) -> torch.Tensor:
         node 1 (s = -1) ---- node 3 (s = 0) ---- node 2 (s = +1)
 
     NOTE the ordering: the two END nodes come first, the MID node last.  This
-    matches how the element edges are listed in Elements.py
+    matches how the element edges are listed in elements.py
     (start vertex, end vertex, mid-side node).
 
     Returns

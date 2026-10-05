@@ -1,5 +1,5 @@
 """
-Grad_shape_functions_2D.py
+grad_shape_functions_2d.py
 ==========================
 
 Derivatives of the shape functions with respect to the REFERENCE coordinates,

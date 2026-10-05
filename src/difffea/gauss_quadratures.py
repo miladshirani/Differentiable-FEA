@@ -1,5 +1,5 @@
 """
-Gauss_Quadratures.py
+gauss_quadratures.py
 ====================
 
 Numerical integration rules on the *reference* elements.

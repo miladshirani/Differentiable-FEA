@@ -1,5 +1,5 @@
 """
-Constitutive_Relations.py
+constitutive_relations.py
 =========================
 
 The MATERIAL LAW.  A hyperelastic material is defined by a single scalar,

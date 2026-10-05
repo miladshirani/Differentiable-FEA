@@ -1,0 +1,8 @@
+torch>=2.2
+numpy
+scipy      # ILU preconditioner
+matplotlib
+pandas
+gmsh        # unstructured meshes (optional: the structured rectangle mesher works without it)
+streamlit   # GUI
+pytest      # tests

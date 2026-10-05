@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Differentiable-FEA: differentiable, matrix-free finite element analysis in functional PyTorch"
+type: software
+authors:
+  - family-names: Shirani
+    given-names: Milad
+license: Apache-2.0
+version: 0.1.0.dev0
+# repository-code and date-released are added at the first public release.
