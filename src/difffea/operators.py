@@ -276,6 +276,107 @@ def make_A_operator(u, theta, params):
 
 
 # =============================================================================
+# 1b. FASTER FORWARD TANGENT OPERATORS (same mathematics, different cost structure)
+# =============================================================================
+# ``make_A_operator`` re-evaluates the whole residual (and the stress derivative inside it) at EVERY
+# Krylov iteration, although u does not change during the linear solve.  Profiling (benchmarks/
+# profile_matvec.py) shows that this costs 3x more than necessary, and that the time goes into
+# many small, unfused element-wise tensor operations -- not into arithmetic or memory bandwidth.
+#
+#   "jvp"        make_A_operator              recompute everything each product        (reference)
+#   "linearize"  make_A_operator_linearize    evaluate the primal ONCE per Newton step, then only
+#                                             propagate the tangent                    (same result)
+#   "qp"         make_A_operator_qp           store the tangent moduli C = d^2 psi/dF^2 at every
+#                                             Gauss point once per Newton step; one product is then
+#                                             gather -> small batched matmul -> scatter-add
+#                                             ("partial assembly"; no global matrix, but ~128 B of
+#                                             storage per Gauss point)
+#
+# All three return a closure v -> A(v) with identical semantics (Dirichlet identity pivot included).
+def make_A_operator_linearize(u, theta, params):
+    """
+    A(v) = m*J(u)*(m*v) + (1-m)*v via ``torch.func.linearize``: the residual and everything it needs at
+    the linearisation point is evaluated ONCE here; each call of the returned closure only pushes the
+    tangent vector through the stored linearised graph.  Mathematically identical to ``make_A_operator``.
+    """
+    from torch.func import linearize
+    m = params["m"]
+    _, jvp_fn = linearize(lambda w: global_residual(w, theta, params), u)
+
+    def A(v):
+        """Jv through the stored linearisation; v has shape (2N,)."""
+        return m * jvp_fn(m * v) + (1.0 - m) * v
+
+    return A
+
+
+def make_A_operator_qp(u, theta, params):
+    """
+    Tangent product with the material tangent STORED at the Gauss points.
+
+    At the linearisation point u the second derivative of the energy
+            C[e, q, i, j, k, l] = d^2 psi / (dF_ij dF_kl)            (n_el, n_q, 2, 2, 2, 2)
+    is computed once (autodiff: ``hessian`` of the plane-strain energy of the chosen material), multiplied
+    by the quadrature weight w_q detJ_q, and kept.  One product A(v) is then, per element e and Gauss point q:
+
+            grad_v   = sum_a v_a (x) dN_a/dX                         gather + einsum   (n_el, n_q, 2, 2)
+            dP       = C : grad_v                                    batched 4x4 matvec
+            f[a, i]  = sum_q dP_ij dN_a/dX_j                         einsum
+            Jv       = scatter-add of f                              one index_add_
+
+    which is exactly J v for the discrete virtual work of ``elem_residual_precomputed`` (the geometric and
+    material parts of the tangent are both inside C because F = I + grad u is the argument of psi).
+
+    Memory: 16 numbers per Gauss point (128 B in float64), e.g. 512 B per Q4 element.  Use
+    ``make_A_operator_linearize`` when that is too much.
+    """
+    conn, m = params["conn"], params["m"]
+    N = params["nodes"].shape[0]
+    n_el, nen = conn.shape
+    dN_dX, w_detJ = get_geometry(params)                       # (n_el, n_q, nen, 2), (n_el, n_q)
+    n_q = dN_dX.shape[1]
+    element_p = element_material_parameters(theta, params)     # (n_el, n_p)
+    psi_fn = psi_2d(material_of(params)[0])
+
+    # deformation gradient at every Gauss point: F = I + sum_a u_a (x) dN_a/dX      (n_el, n_q, 2, 2)
+    ue = u.reshape(N, 2)[conn]                                 # (n_el, nen, 2)
+    F = torch.eye(2, dtype=u.dtype, device=u.device) + torch.einsum("eai,eqaj->eqij", ue, dN_dX)
+
+    # tangent moduli: Hessian of the energy w.r.t. F, vmapped over Gauss points (shared p) and elements
+    hess = torch.func.hessian(psi_fn, argnums=0)               # (F (2,2), p) -> (2, 2, 2, 2)
+    C = vmap(vmap(hess, in_dims=(0, None)), in_dims=(0, 0))(F, element_p)      # (n_el, n_q, 2, 2, 2, 2)
+    # fold the quadrature weight in and flatten (ij) and (kl) so that C acts as a 4x4 matrix
+    C = (C * w_detJ[:, :, None, None, None, None]).reshape(n_el, n_q, 4, 4)
+
+    flat_conn = conn.reshape(-1)
+
+    def A(v):
+        """Jv from the stored moduli; v has shape (2N,)."""
+        ve = (m * v).reshape(N, 2)[conn]                                       # (n_el, nen, 2), masked
+        dgrad = torch.einsum("eai,eqaj->eqij", ve, dN_dX).reshape(n_el, n_q, 4, 1)
+        dP = torch.matmul(C, dgrad).reshape(n_el, n_q, 2, 2)                   # (n_el, n_q, 2, 2)
+        fe = torch.einsum("eqij,eqaj->eai", dP, dN_dX)                         # (n_el, nen, 2)
+        Jv = torch.zeros(N, 2, dtype=v.dtype, device=v.device).index_add_(0, flat_conn, fe.reshape(-1, 2))
+        return m * Jv.reshape(-1) + (1.0 - m) * v
+
+    return A
+
+
+TANGENT_OPERATORS = ("jvp", "linearize", "qp")
+
+
+def make_tangent_operator(kind, u, theta, params):
+    """Build the forward tangent operator by name: one of ``TANGENT_OPERATORS``."""
+    if kind == "jvp":
+        return make_A_operator(u, theta, params)
+    if kind == "linearize":
+        return make_A_operator_linearize(u, theta, params)
+    if kind == "qp":
+        return make_A_operator_qp(u, theta, params)
+    raise ValueError(f"Unknown tangent operator '{kind}'. Choose one of {TANGENT_OPERATORS}.")
+
+
+# =============================================================================
 # 2. TRANSPOSE TANGENT OPERATOR: AT(v) = J^T(u) * v
 # =============================================================================
 def make_AT_operator(u, theta, params):

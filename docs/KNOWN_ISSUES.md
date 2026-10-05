@@ -18,3 +18,9 @@
    per beam height). Use quadratic elements, or a future B-bar/F-bar formulation.
 10. The dolfinx comparison covers Tri3, Tri6, Q4 and Q9 only (dolfinx has no 8-node serendipity geometry), a
     clamp-plus-traction load and the neo-Hookean material. Other materials and boundary conditions are untested against it.
+11. macOS can mark files inside `.venv` as hidden, and Python ignores hidden `.pth` files, so an editable install
+    (`pip install -e .`) may suddenly stop importing `difffea` (`ModuleNotFoundError`). Fix: `chflags -R nohidden .venv`
+    (or set `PYTHONPATH=src`). The test-suite is immune (`pythonpath = ["src", "tests"]` in `pyproject.toml`).
+12. `torch.func.linearize` prints a harmless `get_attr Node` UserWarning (inside PyTorch).
+13. The tangent moduli stored by the default `qp` operator take about 128 bytes per Gauss point (512 B per Q4 element);
+    use `tangent="linearize"` or `"jvp"` if memory is tight. GPU memory use has not been measured yet.

@@ -19,7 +19,7 @@ solution are wasted work.
 """
 
 import torch
-from difffea.operators import global_residual, make_A_operator, make_preconditioner
+from difffea.operators import global_residual, make_tangent_operator, make_preconditioner
 
 
 # =============================================================================
@@ -124,7 +124,7 @@ def armijo_line_search(u, du, rn, theta, params, load_factor, c1=1e-4, min_alpha
 # 3. LEVEL 2: NEWTON ITERATION AT ONE FIXED LOAD FACTOR
 # =============================================================================
 def newton_at_load(u0, theta, params, load_factor, tol, max_newton, verbose, callback, step_id,
-                   preconditioner="jacobi"):
+                   preconditioner="jacobi", tangent="qp"):
     """
     Drive the residual to zero at one fixed load factor with inexact Newton-Krylov.
 
@@ -157,7 +157,7 @@ def newton_at_load(u0, theta, params, load_factor, tol, max_newton, verbose, cal
         eta = min(0.5, float((rn / (r0 + 1e-14)) ** 0.5))
 
         # linearisation at the current state: closures, no matrices
-        A_fn = make_A_operator(u, theta, params)
+        A_fn = make_tangent_operator(tangent, u, theta, params)
         Minv_fn = make_preconditioner(preconditioner, u, theta, params)
 
         # solve  J du = -R  matrix-free, to relative accuracy eta
@@ -184,7 +184,8 @@ def newton_at_load(u0, theta, params, load_factor, tol, max_newton, verbose, cal
 # =============================================================================
 @torch.no_grad()
 def newton_krylov_solve(params, theta, n_load_steps=5, tol=1e-8, max_newton=25,
-                        verbose=True, callback=None, max_cutbacks=8, preconditioner="jacobi"):
+                        verbose=True, callback=None, max_cutbacks=8, preconditioner="jacobi",
+                        tangent="qp"):
     """
     Solve the nonlinear equilibrium equations  R(u, theta) = 0  and report how
     the iteration went.
@@ -209,6 +210,9 @@ def newton_krylov_solve(params, theta, n_load_steps=5, tol=1e-8, max_newton=25,
     callback     : optional function(dict) called after every Newton iteration
     max_cutbacks : how many times the increment may be halved
     preconditioner : "jacobi", "block_jacobi" or "ilu" (see Operators.PRECONDITIONERS)
+    tangent      : how the matrix-free tangent product is evaluated: "qp" (default: tangent stored at
+                   the Gauss points, fastest measured), "linearize" or "jvp" (reference); see
+                   Operators.TANGENT_OPERATORS.  All three apply the same linear operator.
 
     Returns
     -------
@@ -235,7 +239,7 @@ def newton_krylov_solve(params, theta, n_load_steps=5, tol=1e-8, max_newton=25,
             print(f"\n=== Load step {step_id}: load factor {lf:.3f} -> {lf_try:.3f} ===")
 
         u_try, ok, records = newton_at_load(u, theta, params, lf_try, tol, max_newton,
-                                            verbose, callback, step_id, preconditioner)
+                                            verbose, callback, step_id, preconditioner, tangent)
         info["history"] += records
         info["total_newton"] += len(records)
         info["total_cg"] += sum(r["cg_iters"] for r in records)

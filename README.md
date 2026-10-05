@@ -39,6 +39,25 @@ discretisation error or performance, and only one problem family (neo-Hookean, c
 The tolerances of the analytic tests were set after looking at the measured values, so they document the
 current accuracy rather than predict it independently.
 
+## Performance (measured, CPU only so far)
+
+Apple-silicon laptop, 6 threads, float64, Q4 elements. Source: `benchmarks/bench_device.py` and
+`benchmarks/profile_matvec.py` (results in `benchmarks/results/`; one run each, repeat timings vary by about 10 %).
+
+| | jvp (reference) | linearize | stored Gauss-point tangent (`qp`, default) | assembled CSR matrix |
+|---|---|---|---|---|
+| one tangent product, 40k elements | 68 ms | 22 ms | 5.6 ms | 0.61 ms (plus 0.37 s to assemble, 17 MB) |
+| complete nonlinear solve, 10k elements (Jacobi-CG, 17 Newton / 2904 CG iterations in all variants) | 72.2 s | - | 11.0 s | - |
+
+* The three matrix-free variants apply the same operator (tests: agreement to 1e-11 for every element and material;
+  the two solutions differ by 3e-14). The cost of one product grows linearly with the mesh (2k to 160k elements).
+* The original product (`jvp`) reached about 0.3 % of the memory bandwidth; time went into many small unfused
+  element-wise operations, not into arithmetic. `qp` reaches about 3 %.
+* **On this CPU, in 2D, an assembled sparse matrix is still about 10x faster per product than the best matrix-free
+  variant.** Matrix-free is expected to pay off for high-order elements, 3D and on GPUs (memory), not here;
+  that has to be measured, and has not been yet.
+* **GPU: not measured.** `notebooks/colab_gpu.ipynb` runs the same scripts on a Colab T4; results will be added when they exist.
+
 ## Design rules
 
 * **Functional, no classes** in the numerical code: state lives in plain dictionaries (`spec` → `params` → `fields`),

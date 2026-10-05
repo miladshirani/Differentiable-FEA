@@ -34,4 +34,5 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-filterwarnings = ["ignore:.*torch.jit.script.*"]
+pythonpath = ["src", "tests"]      # tests run against the working tree even without an editable install
+filterwarnings = ["ignore:.*torch.jit.script.*", "ignore:Attempted to insert a get_attr Node.*"]

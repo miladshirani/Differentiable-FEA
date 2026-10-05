@@ -1,0 +1,99 @@
+{
+  "difffea": "0.1.0.dev0",
+  "torch": "2.14.1",
+  "platform": "macOS-15.6-arm64-arm-64bit",
+  "python": "3.12.11",
+  "device": "cpu",
+  "threads": 6,
+  "element_type": "quad4",
+  "n_elements": 39903,
+  "n_dofs": 80656,
+  "seconds": {
+    "residual R(u)": 0.02997389592928812,
+    "A(v) = jvp (current)": 0.0721373749547638,
+    "A(v) via linearize (primal cached)": 0.02452495851321146,
+    "A(v) stored Gauss-point tangent (qp)": 0.006412937538698316,
+    "setup: linearize": 0.46031720901373774,
+    "setup: qp (moduli at Gauss points)": 0.13201866706367582,
+    "A^T(v) = vjp (pullback only)": 0.027063520974479616,
+    "Jacobi diagonal (once per Newton step)": 0.25141725002322346
+  },
+  "linearize_vs_jvp_rel_diff": 0.0,
+  "qp_vs_jvp_rel_diff": 2.2335361962545782e-16,
+  "assembled": {
+    "assembly_s": 0.3678797499742359,
+    "spmv_s": 0.000605729001108557,
+    "nnz": 1441600,
+    "matrix_MB": 16.805484771728516,
+    "breakeven_matvecs": 5.14289507908964
+  },
+  "bandwidth_GBps_triad": 129.40200125722063,
+  "min_traffic_MB_per_matvec": 22.5606689453125,
+  "ideal_matvec_s_at_triad_bandwidth": 0.00018281460696250215,
+  "fraction_of_bandwidth_current": 0.002534256438872946,
+  "fraction_of_bandwidth_linearize": 0.007454226960833428,
+  "fraction_of_bandwidth_qp": 0.02850715539630992,
+  "qp_storage_MB": 19.48388671875,
+  "profile_A_v_top_ops": [
+    {
+      "op": "aten::mul",
+      "calls": 102,
+      "percent": 21.606318299169374,
+      "ms_per_call_total": 12.791729999999987
+    },
+    {
+      "op": "aten::add",
+      "calls": 57,
+      "percent": 19.44026957390011,
+      "ms_per_call_total": 11.509349999999996
+    },
+    {
+      "op": "aten::copy_",
+      "calls": 96,
+      "percent": 13.98469755495888,
+      "ms_per_call_total": 8.279451999999976
+    },
+    {
+      "op": "aten::fill_",
+      "calls": 45,
+      "percent": 12.91607996067232,
+      "ms_per_call_total": 7.646791333333378
+    },
+    {
+      "op": "autograd::engine::evaluate_function: SelectBackward0",
+      "calls": 18,
+      "percent": 7.113681377877608,
+      "ms_per_call_total": 4.211559333333364
+    },
+    {
+      "op": "aten::cat",
+      "calls": 7,
+      "percent": 4.259100267363592,
+      "ms_per_call_total": 2.5215430000000176
+    },
+    {
+      "op": "aten::bmm",
+      "calls": 10,
+      "percent": 3.758633412735979,
+      "ms_per_call_total": 2.2252483333333797
+    },
+    {
+      "op": "autograd::engine::evaluate_function: MulBackward0",
+      "calls": 7,
+      "percent": 2.7824234025463586,
+      "ms_per_call_total": 1.6472963333333186
+    },
+    {
+      "op": "aten::sub",
+      "calls": 15,
+      "percent": 1.5733533295464637,
+      "ms_per_call_total": 0.9314826666666796
+    },
+    {
+      "op": "aten::select_backward",
+      "calls": 54,
+      "percent": 1.3795522295547018,
+      "ms_per_call_total": 0.8167453333333591
+    }
+  ]
+}
