@@ -1,0 +1,86 @@
+{
+  "difffea": "0.1.0.dev0",
+  "torch": "2.11.0+cu130",
+  "python": "3.13.15",
+  "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+  "device": "cuda",
+  "threads": 1,
+  "dtype": "float64",
+  "gpu": "Tesla T4",
+  "cuda": "13.0",
+  "matvec_sweep": [
+    {
+      "n_elements": 1953,
+      "n_dofs": 4096,
+      "residual_s": 0.004049988000133453,
+      "A_jvp_s": 0.013680980000117415,
+      "A_linearize_s": 0.003011196999977983,
+      "A_qp_s": 0.0021239889999833395,
+      "setup_qp_s": 0.012372296999956234,
+      "peak_gpu_MB": 54.75927734375
+    },
+    {
+      "n_elements": 9870,
+      "n_dofs": 20164,
+      "residual_s": 0.010377552999898398,
+      "A_jvp_s": 0.017743254999913916,
+      "A_linearize_s": 0.004719538000017565,
+      "A_qp_s": 0.004076842999893415,
+      "setup_qp_s": 0.01285522300008779,
+      "peak_gpu_MB": 246.09765625
+    },
+    {
+      "n_elements": 39903,
+      "n_dofs": 80656,
+      "residual_s": 0.01818819999994048,
+      "A_jvp_s": 0.050470273999962956,
+      "A_linearize_s": 0.018388119000064762,
+      "A_qp_s": 0.014798821999875145,
+      "setup_qp_s": 0.03872402999991209,
+      "peak_gpu_MB": 978.8857421875
+    },
+    {
+      "n_elements": 159612,
+      "n_dofs": 320922,
+      "residual_s": 0.0723036360000151,
+      "A_jvp_s": 0.20186379099982332,
+      "A_linearize_s": 0.07338680900011241,
+      "A_qp_s": 0.05911971800014726,
+      "setup_qp_s": 0.1542666499999541,
+      "peak_gpu_MB": 3868.62890625
+    }
+  ],
+  "solves": [
+    {
+      "tangent": "jvp",
+      "n_elements": 9870,
+      "seconds": 43.159930940000095,
+      "converged": true,
+      "newton": 17,
+      "cg": 2849,
+      "final_residual": 7.29989009222168e-08
+    },
+    {
+      "tangent": "qp",
+      "n_elements": 9870,
+      "seconds": 12.690860159000067,
+      "converged": true,
+      "newton": 17,
+      "cg": 2982,
+      "final_residual": 8.012394792409157e-08
+    },
+    {
+      "tangent": "qp",
+      "n_elements": 9870,
+      "seconds": 48.902457523000066,
+      "converged": true,
+      "newton": 17,
+      "cg": 2966,
+      "final_residual": 8.673871944893501e-08,
+      "note": "CPU reference run on the same machine"
+    }
+  ],
+  "max_diff_qp_vs_jvp": 4.14011035547236e-12,
+  "max_diff_gpu_vs_cpu": 2.414783289864548e-12,
+  "peak_gpu_MB_total": 3868.62890625
+}
