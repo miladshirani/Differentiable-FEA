@@ -69,7 +69,7 @@ def test_unknown_operator_name_is_rejected():
         make_tangent_operator("nope", u, theta, params)
 
 
-@pytest.mark.parametrize("kind", ["linearize", "qp", "qp_ew"])
+@pytest.mark.parametrize("kind", ["auto", "linearize", "qp", "qp_ew"])
 def test_solver_reaches_the_same_solution(kind):
     params, theta = small_problem("quad9", load=(0.0, -40.0), h=0.5)
     tol = 1e-9 * float(torch.norm(params["f"]))
@@ -77,3 +77,10 @@ def test_solver_reaches_the_same_solution(kind):
     u, info = newton_krylov_solve(params, theta, 3, tol, verbose=False, preconditioner="ilu", tangent=kind)
     assert info["converged"] and info_ref["converged"]
     assert _rel(u, u_ref) < 1e-7
+
+
+def test_auto_picks_the_cpu_variant_on_the_cpu():
+    params, theta = small_problem("quad4", h=0.5)
+    u, v = _state(params)
+    auto = make_tangent_operator("auto", u, theta, params)(v)
+    assert torch.equal(auto, make_tangent_operator("qp", u, theta, params)(v))      # CPU -> "qp", bit for bit

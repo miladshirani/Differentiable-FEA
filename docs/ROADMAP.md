@@ -6,7 +6,7 @@ Order chosen so that every claim rests on something measured. "Done" means verif
 |---|------|--------|
 | 0 | Package layout (`src/difffea`), license, CI, notebook safety scan, secret scan | done locally; CI not yet run on GitHub |
 | 1 | Validation: analytic solutions (beam, Kirsch/Heywood) and comparison with FEniCSx/dolfinx | done for the cases listed in the README; other geometries/materials/load types not yet compared |
-| 2 | Profile on CPU, then verify the GPU path on a Colab T4; honest CPU-vs-GPU timings | CPU profile, a 6.5x faster tangent product and the first T4 measurements done; GPU product is far from bandwidth-bound, element-wise variant `qp_ew` awaiting its GPU measurement |
+| 2 | Profile on CPU, then verify the GPU path on a Colab T4; honest CPU-vs-GPU timings | done: CPU profile, GPU path verified on a Colab T4 (matches CPU to 2.4e-12), tangent product 11.6x faster on the GPU after profiling (7.9 % of bandwidth); next candidates: kernel fusion (torch.compile / CUDA graphs), float32, per-variant GPU memory |
 | 3 | 3D hexahedra (Hex8/Hex20), where matrix-free and GPUs pay off | planned |
 | 4 | Scalable preconditioner: Chebyshev smoother, p-multigrid, geometric/algebraic multigrid | planned |
 | 5 | Distributed memory: mesh partitioning, halo exchange, distributed CG (`torch.distributed`, gloo on a laptop first) | planned |

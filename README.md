@@ -39,12 +39,12 @@ discretisation error or performance, and only one problem family (neo-Hookean, c
 The tolerances of the analytic tests were set after looking at the measured values, so they document the
 current accuracy rather than predict it independently.
 
-## Performance (measured, CPU only so far)
+## Performance (measured)
 
 Apple-silicon laptop, 6 threads, float64, Q4 elements. Source: `benchmarks/bench_device.py` and
 `benchmarks/profile_matvec.py` (results in `benchmarks/results/`; one run each, repeat timings vary by about 10 %).
 
-| | jvp (reference) | linearize | stored Gauss-point tangent (`qp`, default) | assembled CSR matrix |
+| | jvp (reference) | linearize | stored Gauss-point tangent (`qp`, default on CPU) | assembled CSR matrix |
 |---|---|---|---|---|
 | one tangent product, 40k elements | 68 ms | 22 ms | 5.6 ms | 0.61 ms (plus 0.37 s to assemble, 17 MB) |
 | complete nonlinear solve, 10k elements (Jacobi-CG, 17 Newton / 2904 CG iterations in all variants) | 72.2 s | - | 11.0 s | - |
@@ -56,26 +56,28 @@ Apple-silicon laptop, 6 threads, float64, Q4 elements. Source: `benchmarks/bench
 * **On this CPU, in 2D, an assembled sparse matrix is still about 10x faster per product than the best matrix-free
   variant.** Matrix-free is expected to pay off for high-order elements, 3D and on GPUs (memory), not here;
   that has to be measured, and has only been started (see the GPU section).
-### First GPU measurement (free Colab T4, float64, two runs)
+### GPU measurement (free Colab T4, float64)
 
-Source: `benchmarks/results/bench_cuda_t4_colab.json`, `bench_cpu_colab.json`, `profile_cuda_quad4.json` (the Colab CPU
-has **one** thread, so GPU-vs-CPU ratios against it say little about a modern multi-core CPU).
+Sources: `benchmarks/results/bench_cuda_t4_colab_run2.json`, `bench_cpu_colab_run2.json`, `profile_cuda_t4_colab.json`
+(and the first run, `*_colab.json`, which agrees). The Colab CPU has **one** thread, so ratios against it say little about
+a modern multi-core CPU; the laptop column is the 6-thread run from the table above. Q4, uniaxial tension, one run each.
 
-| Q4, uniaxial tension | Colab CPU (1 thread) | T4 GPU | laptop CPU (6 threads, from above) |
-|---|---|---|---|
-| tangent product `qp`, 40k elements | 46-73 ms | 14.8 ms (both runs) | 5.6 ms |
-| tangent product `qp`, 160k elements | 184-285 ms | 59 ms (both runs) | 23 ms |
-| complete solve, 10k elements, `qp` | 45-49 s | 12.4-12.7 s | 11.0 s |
-| complete solve, 10k elements, `jvp` | 201-211 s | 43-45 s | 72.2 s |
+| | `jvp` (reference) | `qp` | `qp_ew` | laptop CPU `qp` |
+|---|---|---|---|---|
+| T4: tangent product, 40k elements | 50.9 ms | 14.9 ms | **1.28 ms** | 5.6 ms |
+| T4: tangent product, 160k elements | 203 ms | 59.4 ms | **5.0 ms** | 23 ms |
+| T4: complete solve, 10k elements | 48.3 s | 12.8 s | **2.90 s** | 11.0 s |
+| Colab CPU (1 thread): complete solve, 10k | 201-211 s | 49 s | 124 s | |
+| fraction of the T4's measured memory bandwidth (233 GB/s) | 0.20 % | 0.68 % | **7.9 %** | |
 
-* **The CUDA path works**: the same solve on GPU and CPU agrees to 1e-12 (relative, max norm).
-* **The T4 is not faster than the laptop CPU here.** The tangent product reaches 0.68 % of the T4's measured memory
-  bandwidth (233 GB/s) and its time grows linearly with the mesh, so it is throughput-limited, not launch-limited.
-* The profile of the reference `jvp` operator on the T4 puts 74 % of the time into cuBLAS batched double-precision GEMM
-  (`volta_dgemm_64x64`) applied to 2x2 / 4x4 matrices: a bad fit. The `qp` operator uses the same kind of batched calls;
-  `qp_ew` (same arithmetic with element-wise multiply-and-sum) was added to test that explanation and has **not yet been
-  measured on a GPU**. On the CPU it is slower than `qp` (12 vs 5 ms at 40k elements).
-* GPU memory: peak 3.9 GB at 160k elements over all operators together (not attributed per operator).
+* **The CUDA path works**: the same solve on GPU and CPU agrees to 2.4e-12 (relative, max norm); all variants agree to about 1e-12.
+* **Why `qp_ew` exists**: the profiler showed that 88 % of the `qp` product on the T4 was cuBLAS batched double-precision
+  GEMM (`volta_dgemm_64x64`) applied to 2x2 / 4x4 matrices. `qp_ew` does the same arithmetic with element-wise multiply-and-sum
+  and is 11.6x faster on the GPU, but 3x *slower* on a CPU. `tangent="auto"` (the default) therefore uses `qp_ew` on CUDA and `qp` on the CPU.
+* On this T4 the complete solve is about 3.8x faster than on the laptop CPU and 19x faster than on the 1-thread Colab CPU.
+  The cost of a product still grows linearly with the mesh (1.28 ms -> 5.0 ms for 4x the elements); the smallest mesh sits at about 0.27 ms
+  (launch overhead). 7.9 % of the bandwidth means there is room left (fusing the element-wise kernels is the next candidate).
+* Not yet measured: GPU memory per variant (the peak of 3.9 GB at 160k elements covers all variants together), float32, ILU on GPU (CPU only), 3D.
 
 ## Design rules
 

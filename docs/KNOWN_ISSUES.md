@@ -6,7 +6,7 @@
 2. **float32 does not work with PyTorch 2.14.** `jacfwd`/`jvp` on 0-dim float32 inputs produce float64 internally
    (`grad_shape_functions_2d`, `kinematics`), so float32 runs fail. Apple MPS has no float64, so it is unusable.
    float64 works (also on CUDA). An earlier `jvp`-based workaround did not fix it.
-3. **CUDA is unverified.** `spec["device"] = "cuda"` and `to_device` are written and CPU-tested only.
+3. **CUDA is verified only on one GPU** (a Colab Tesla T4, float64, Q4/tension problems; solution equals the CPU one to 2.4e-12). Other GPUs, multi-GPU, the ILU/Gmsh paths on GPU and large 3D problems are untested.
 4. **Preconditioning is the main algorithmic gap.** Point-Jacobi needs thousands of CG iterations on quadratic or
    bending-dominated meshes; nodal block-Jacobi barely helps; ILU is excellent but CPU-only and its memory
    grows faster than linear. A scalable (multigrid-type) preconditioner is missing.
@@ -22,8 +22,8 @@
     (`pip install -e .`) may suddenly stop importing `difffea` (`ModuleNotFoundError`). Fix: `chflags -R nohidden .venv`
     (or set `PYTHONPATH=src`). The test-suite is immune (`pythonpath = ["src", "tests"]` in `pyproject.toml`).
 12. `torch.func.linearize` prints a harmless `get_attr Node` UserWarning (inside PyTorch).
-13. The tangent moduli stored by the default `qp` operator take about 128 bytes per Gauss point (512 B per Q4 element);
-    use `tangent="linearize"` or `"jvp"` if memory is tight. GPU memory use has not been measured yet.
+13. The tangent moduli stored by the default operators (`qp`, `qp_ew`) take about 128 bytes per Gauss point (512 B per Q4 element);
+    use `tangent="linearize"` or `"jvp"` if memory is tight. GPU memory per variant has not been measured separately.
 14. The Gmsh wheel needs the system library `libGLU.so.1`. Colab does not have it (Gmsh meshing fails there with
     `OSError: libGLU.so.1`), so the Colab notebook uses the structured mesher. On Ubuntu: `sudo apt-get install libglu1-mesa`.
     The CI workflow installs it, but that workflow has not run yet.

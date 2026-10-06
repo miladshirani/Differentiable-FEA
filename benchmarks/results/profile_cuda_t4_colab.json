@@ -1,0 +1,188 @@
+{
+  "difffea": "0.1.0.dev0",
+  "torch": "2.11.0+cu130",
+  "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+  "python": "3.13.15",
+  "device": "cuda",
+  "gpu": "Tesla T4",
+  "threads": 1,
+  "element_type": "quad4",
+  "n_elements": 39903,
+  "n_dofs": 80656,
+  "seconds": {
+    "residual R(u)": 0.0185936669999478,
+    "A(v) = jvp (current)": 0.05122029200003908,
+    "A(v) via linearize (primal cached)": 0.01859152300005462,
+    "A(v) stored Gauss-point tangent (qp)": 0.01492696650001335,
+    "A(v) stored tangent, element-wise (qp_ew)": 0.001289468000038596,
+    "setup: linearize": 0.73400742299998,
+    "setup: qp (moduli at Gauss points)": 0.05014047099996333,
+    "A^T(v) = vjp (pullback only)": 0.01890608449997444,
+    "Jacobi diagonal (once per Newton step)": 0.08904631999996582
+  },
+  "linearize_vs_jvp_rel_diff": 2.2335361962545782e-16,
+  "qp_vs_jvp_rel_diff": 2.2335361962545782e-16,
+  "qp_ew_vs_jvp_rel_diff": 3.350304294381868e-16,
+  "peak_memory_MB": 1373.10986328125,
+  "bandwidth_GBps_triad": 233.14570593621067,
+  "min_traffic_MB_per_matvec": 22.5606689453125,
+  "ideal_matvec_s_at_triad_bandwidth": 0.00010146691702944127,
+  "fraction_of_bandwidth_current": 0.00198099060093925,
+  "fraction_of_bandwidth_linearize": 0.005457697953478215,
+  "fraction_of_bandwidth_qp": 0.0067975577642885796,
+  "fraction_of_bandwidth_qp_ew": 0.07868897640453597,
+  "qp_storage_MB": 19.48388671875,
+  "note": "operator names in profile_top_ops are shortened (the full CUDA kernel names are very long); percentages and times are as printed by the run",
+  "profile_top_ops": {
+    "jvp": [
+      {
+        "op": "aten::bmm",
+        "calls": 10,
+        "percent": 38.835090378607504,
+        "ms_per_call_total": 39.60045700000002
+      },
+      {
+        "op": "volta_dgemm_64x64_nt",
+        "calls": 3,
+        "percent": 35.57020970536805,
+        "ms_per_call_total": 36.27123166666667
+      },
+      {
+        "op": "gemmSN_NN_kernel (cublas batched gemv)",
+        "calls": 3,
+        "percent": 3.2648806732394573,
+        "ms_per_call_total": 3.3292253333333477
+      },
+      {
+        "op": "aten::copy_",
+        "calls": 98,
+        "percent": 2.9901814779442826,
+        "ms_per_call_total": 3.0491123333333916
+      },
+      {
+        "op": "elementwise direct_copy kernel",
+        "calls": 42,
+        "percent": 2.6234330663170664,
+        "ms_per_call_total": 2.6751360000000157
+      },
+      {
+        "op": "aten::mul",
+        "calls": 102,
+        "percent": 2.588004300681668,
+        "ms_per_call_total": 2.6390090000000237
+      },
+      {
+        "op": "vectorized_elementwise add kernel",
+        "calls": 40,
+        "percent": 2.5175334813782846,
+        "ms_per_call_total": 2.5671493333333104
+      },
+      {
+        "op": "aten::add",
+        "calls": 57,
+        "percent": 2.488191751707638,
+        "ms_per_call_total": 2.537229333333307
+      }
+    ],
+    "qp": [
+      {
+        "op": "aten::bmm",
+        "calls": 3,
+        "percent": 48.216477342314676,
+        "ms_per_call_total": 14.241004666666665
+      },
+      {
+        "op": "volta_dgemm_64x64_nt",
+        "calls": 1,
+        "percent": 40.14713655635938,
+        "ms_per_call_total": 11.857679999999998
+      },
+      {
+        "op": "gemv2N_kernel (cublas batched gemv)",
+        "calls": 3,
+        "percent": 4.351623965817103,
+        "ms_per_call_total": 1.2852763333333315
+      },
+      {
+        "op": "gemmSN_NN_kernel (cublas batched gemv)",
+        "calls": 1,
+        "percent": 3.717716820138186,
+        "ms_per_call_total": 1.0980483333333335
+      },
+      {
+        "op": "aten::copy_",
+        "calls": 4,
+        "percent": 0.8474475081265922,
+        "ms_per_call_total": 0.25029833333333423
+      },
+      {
+        "op": "elementwise direct_copy kernel",
+        "calls": 4,
+        "percent": 0.8474475081265922,
+        "ms_per_call_total": 0.25029833333333423
+      },
+      {
+        "op": "aten::index",
+        "calls": 1,
+        "percent": 0.8000695839279308,
+        "ms_per_call_total": 0.23630500000000104
+      },
+      {
+        "op": "vectorized_gather_kernel",
+        "calls": 1,
+        "percent": 0.8000695839279308,
+        "ms_per_call_total": 0.23630500000000104
+      }
+    ],
+    "qp_ew": [
+      {
+        "op": "aten::mul",
+        "calls": 6,
+        "percent": 20.548635396154182,
+        "ms_per_call_total": 0.507490333333333
+      },
+      {
+        "op": "elementwise mul kernel",
+        "calls": 3,
+        "percent": 20.047644049015325,
+        "ms_per_call_total": 0.49511733333333313
+      },
+      {
+        "op": "aten::sum",
+        "calls": 3,
+        "percent": 18.731143146747716,
+        "ms_per_call_total": 0.4626036666666666
+      },
+      {
+        "op": "reduce_kernel<128,4> sum",
+        "calls": 2,
+        "percent": 11.367384206740077,
+        "ms_per_call_total": 0.2807406666666666
+      },
+      {
+        "op": "aten::index",
+        "calls": 1,
+        "percent": 9.587156891988368,
+        "ms_per_call_total": 0.23677433333333314
+      },
+      {
+        "op": "vectorized_gather_kernel",
+        "calls": 1,
+        "percent": 9.587156891988368,
+        "ms_per_call_total": 0.23677433333333314
+      },
+      {
+        "op": "reduce_kernel<512,1> sum",
+        "calls": 1,
+        "percent": 7.363758940007638,
+        "ms_per_call_total": 0.18186299999999997
+      },
+      {
+        "op": "aten::index_add_",
+        "calls": 1,
+        "percent": 0.8106776657385341,
+        "ms_per_call_total": 0.020021333333333436
+      }
+    ]
+  }
+}

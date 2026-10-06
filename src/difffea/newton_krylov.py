@@ -124,7 +124,7 @@ def armijo_line_search(u, du, rn, theta, params, load_factor, c1=1e-4, min_alpha
 # 3. LEVEL 2: NEWTON ITERATION AT ONE FIXED LOAD FACTOR
 # =============================================================================
 def newton_at_load(u0, theta, params, load_factor, tol, max_newton, verbose, callback, step_id,
-                   preconditioner="jacobi", tangent="qp"):
+                   preconditioner="jacobi", tangent="auto"):
     """
     Drive the residual to zero at one fixed load factor with inexact Newton-Krylov.
 
@@ -185,7 +185,7 @@ def newton_at_load(u0, theta, params, load_factor, tol, max_newton, verbose, cal
 @torch.no_grad()
 def newton_krylov_solve(params, theta, n_load_steps=5, tol=1e-8, max_newton=25,
                         verbose=True, callback=None, max_cutbacks=8, preconditioner="jacobi",
-                        tangent="qp"):
+                        tangent="auto"):
     """
     Solve the nonlinear equilibrium equations  R(u, theta) = 0  and report how
     the iteration went.
@@ -210,9 +210,9 @@ def newton_krylov_solve(params, theta, n_load_steps=5, tol=1e-8, max_newton=25,
     callback     : optional function(dict) called after every Newton iteration
     max_cutbacks : how many times the increment may be halved
     preconditioner : "jacobi", "block_jacobi" or "ilu" (see Operators.PRECONDITIONERS)
-    tangent      : how the matrix-free tangent product is evaluated: "qp" (default: tangent stored at
-                   the Gauss points, fastest measured), "linearize" or "jvp" (reference); see
-                   Operators.TANGENT_OPERATORS.  All three apply the same linear operator.
+    tangent      : how the matrix-free tangent product is evaluated: "auto" (default: the fastest measured
+                   variant for the device), "qp", "qp_ew" (tangent stored at the Gauss points), "linearize"
+                   or "jvp" (reference); see Operators.TANGENT_OPERATORS.  All apply the same linear operator.
 
     Returns
     -------

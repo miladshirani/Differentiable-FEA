@@ -1,0 +1,102 @@
+{
+  "difffea": "0.1.0.dev0",
+  "torch": "2.11.0+cu130",
+  "python": "3.13.15",
+  "platform": "Linux-6.6.122+-x86_64-with-glibc2.39",
+  "device": "cuda",
+  "threads": 1,
+  "dtype": "float64",
+  "gpu": "Tesla T4",
+  "cuda": "13.0",
+  "matvec_sweep": [
+    {
+      "n_elements": 1953,
+      "n_dofs": 4096,
+      "residual_s": 0.005324177000034069,
+      "A_jvp_s": 0.019092021000005843,
+      "A_linearize_s": 0.0026730540000698966,
+      "A_qp_s": 0.002139893000048687,
+      "A_qp_ew_s": 0.00026795100006893335,
+      "setup_qp_s": 0.013473899000018719,
+      "peak_gpu_MB": 54.75927734375
+    },
+    {
+      "n_elements": 9870,
+      "n_dofs": 20164,
+      "residual_s": 0.010418176999905882,
+      "A_jvp_s": 0.018322938999972394,
+      "A_linearize_s": 0.004727193000007901,
+      "A_qp_s": 0.004113364000090769,
+      "A_qp_ew_s": 0.00038101899997400324,
+      "setup_qp_s": 0.013751132000038524,
+      "peak_gpu_MB": 246.09765625
+    },
+    {
+      "n_elements": 39903,
+      "n_dofs": 80656,
+      "residual_s": 0.018407899999942856,
+      "A_jvp_s": 0.050854500000014013,
+      "A_linearize_s": 0.018570958999930554,
+      "A_qp_s": 0.014910681000060322,
+      "A_qp_ew_s": 0.001282034999917414,
+      "setup_qp_s": 0.03893174299992097,
+      "peak_gpu_MB": 978.8857421875
+    },
+    {
+      "n_elements": 159612,
+      "n_dofs": 320922,
+      "residual_s": 0.07227089799994246,
+      "A_jvp_s": 0.20271133599999303,
+      "A_linearize_s": 0.07373812000003,
+      "A_qp_s": 0.05944279599998481,
+      "A_qp_ew_s": 0.0050084350000361155,
+      "setup_qp_s": 0.15460077800003091,
+      "peak_gpu_MB": 3868.6552734375
+    }
+  ],
+  "solves": [
+    {
+      "tangent": "jvp",
+      "n_elements": 9870,
+      "seconds": 48.33499730400001,
+      "converged": true,
+      "newton": 17,
+      "cg": 3028,
+      "final_residual": 7.382724347209229e-08
+    },
+    {
+      "tangent": "qp",
+      "n_elements": 9870,
+      "seconds": 12.780781582000031,
+      "converged": true,
+      "newton": 17,
+      "cg": 2969,
+      "final_residual": 8.16118621330862e-08
+    },
+    {
+      "tangent": "qp_ew",
+      "n_elements": 9870,
+      "seconds": 2.902500477999979,
+      "converged": true,
+      "newton": 17,
+      "cg": 2982,
+      "final_residual": 7.579002053487404e-08
+    },
+    {
+      "tangent": "qp",
+      "n_elements": 9870,
+      "seconds": 55.54941184300003,
+      "converged": true,
+      "newton": 17,
+      "cg": 2966,
+      "final_residual": 8.673871944893501e-08,
+      "note": "CPU reference run on the same machine"
+    }
+  ],
+  "max_diff_vs_first": {
+    "qp": 5.632278102430561e-12,
+    "qp_ew": 2.3016901553224235e-12
+  },
+  "max_diff_gpu_vs_cpu": 2.4186103589425686e-12,
+  "peak_gpu_MB_total": 3868.6552734375
+}
