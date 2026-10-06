@@ -60,10 +60,14 @@ def solve_difffea(geometry, element_type, h):
     return spec, params, u.reshape(-1, 2), fields, support_reactions(u, theta, params), secs
 
 
-def run_dolfinx(python, spec, params, workdir):
-    """Export the case, run the dolfinx reference in a child process, return its results."""
+def run_dolfinx(python, spec, params, workdir, lmbda_scale=1.0):
+    """
+    Export the case, run the dolfinx reference in a child process, return its results.
+    ``lmbda_scale`` != 1 deliberately perturbs the reference material (negative control, see main).
+    """
     el = get_element(spec["element_type"])
     mu, lmbda = lame_parameters(spec["E"], spec["nu"])
+    lmbda *= lmbda_scale
     fin, fout = os.path.join(workdir, "case_in.npz"), os.path.join(workdir, "case_out.npz")
     np.savez(fin, nodes=params["nodes"].numpy(), conn=params["conn"].numpy(), family=el["family"],
              order=el["order"], mu=mu, lmbda=lmbda, force=np.array(spec["load_value"], dtype=float),
@@ -99,11 +103,19 @@ def main():
                              max_u=float(np.abs(u_ref).max()), rel_err_u=err_u, rel_err_energy=err_e,
                              rel_err_reaction=err_r, dolfinx_newton_iterations=int(ref["newton"])))
 
+    # ---- negative control: does the comparison notice a 0.1 % change of the reference material? ----------
+    spec, params, u, fields, reaction, secs = solve_difffea("plate_hole", "quad4", 0.25)
+    with tempfile.TemporaryDirectory() as workdir:
+        ref = run_dolfinx(python, spec, params, workdir, lmbda_scale=1.001)
+    control = dict(case="plate_hole/quad4", perturbation="second Lame parameter of the reference x 1.001",
+                   rel_err_u=float(np.abs(u.numpy() - ref["u"]).max() / np.abs(ref["u"]).max()))
+    print(f"negative control ({control['perturbation']}): max|du|/max|u| = {control['rel_err_u']:.2e}")
+
     os.makedirs(os.path.dirname(RESULTS), exist_ok=True)
     with open(RESULTS, "w") as fh:
         json.dump(dict(difffea=difffea.__version__, torch=torch.__version__, dolfinx=version,
                        platform=platform.platform(), python=platform.python_version(), n_load_steps=N_STEPS,
-                       cases=rows), fh, indent=2)
+                       cases=rows, negative_control=control), fh, indent=2)
     print("\nwrote", os.path.relpath(RESULTS))
 
 

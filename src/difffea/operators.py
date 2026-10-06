@@ -361,7 +361,7 @@ def make_A_operator_qp(u, theta, params):
 
     NOTE (measured on a Tesla T4): the einsum/matmul calls dispatch to cuBLAS batched GEMM with 64x64 tiles
     for 2x2 / 4x4 matrices, which wastes the GPU; ``make_A_operator_qp_ew`` does the same arithmetic with
-    plain element-wise operations (measured 11.6x faster on a T4; 3x slower on a CPU).
+    plain element-wise operations (measured 11.6x faster on a T4; 2-3x slower on a CPU).
     """
     conn, m = params["conn"], params["m"]
     N = params["nodes"].shape[0]
@@ -420,7 +420,7 @@ def make_tangent_operator(kind, u, theta, params):
     Build the forward tangent operator by name: one of ``TANGENT_OPERATORS``.
 
     "auto" picks the fastest MEASURED variant for the device of ``u``: "qp_ew" on CUDA (11.6x faster than "qp"
-    on a Tesla T4, because small batched GEMMs are slow on GPUs) and "qp" on the CPU (3x faster than "qp_ew").
+    on a Tesla T4, because small batched GEMMs are slow on GPUs) and "qp" on the CPU (2-3x faster than "qp_ew").
     """
     if kind == "auto":
         kind = "qp_ew" if u.device.type == "cuda" else "qp"

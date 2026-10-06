@@ -14,9 +14,9 @@
       "n_nodes": 207,
       "n_elements": 354,
       "max_u": 0.29109003855758814,
-      "rel_err_u": 8.115033736667918e-16,
+      "rel_err_u": 8.747289377195458e-16,
       "rel_err_energy": 0.0,
-      "rel_err_reaction": 1.243449787580175e-16,
+      "rel_err_reaction": 3.197750691334045e-16,
       "dolfinx_newton_iterations": 12
     },
     {
@@ -27,9 +27,9 @@
       "n_nodes": 330,
       "n_elements": 146,
       "max_u": 0.29681241171172573,
-      "rel_err_u": 8.829887579132606e-14,
-      "rel_err_energy": 1.6190983919315475e-14,
-      "rel_err_reaction": 3.6983801654612696e-14,
+      "rel_err_u": 8.857941233077427e-14,
+      "rel_err_energy": 1.667793080410692e-14,
+      "rel_err_reaction": 3.707702515140394e-14,
       "dolfinx_newton_iterations": 12
     },
     {
@@ -40,9 +40,9 @@
       "n_nodes": 248,
       "n_elements": 212,
       "max_u": 0.2951114681006843,
-      "rel_err_u": 2.4241686237986507e-14,
+      "rel_err_u": 2.4218173448230944e-14,
       "rel_err_energy": 4.776332594601105e-15,
-      "rel_err_reaction": 1.3872562203242095e-14,
+      "rel_err_reaction": 1.3904486348886827e-14,
       "dolfinx_newton_iterations": 12
     },
     {
@@ -53,9 +53,9 @@
       "n_nodes": 512,
       "n_elements": 116,
       "max_u": 0.2973408408598688,
-      "rel_err_u": 2.1352895564949724e-15,
-      "rel_err_energy": 3.6480591534524e-16,
-      "rel_err_reaction": 4.2210089531393216e-16,
+      "rel_err_u": 2.590351265256196e-15,
+      "rel_err_energy": 6.080098589087333e-16,
+      "rel_err_reaction": 4.557110528395037e-16,
       "dolfinx_newton_iterations": 12
     },
     {
@@ -66,9 +66,9 @@
       "n_nodes": 45,
       "n_elements": 32,
       "max_u": 0.5168860494403356,
-      "rel_err_u": 4.295813461505736e-16,
-      "rel_err_energy": 3.1383715969835196e-15,
-      "rel_err_reaction": 4.455080288318128e-15,
+      "rel_err_u": 5.369766826882171e-16,
+      "rel_err_energy": 2.7691514091031056e-15,
+      "rel_err_reaction": 3.7472288578273494e-15,
       "dolfinx_newton_iterations": 18
     },
     {
@@ -79,10 +79,15 @@
       "n_nodes": 45,
       "n_elements": 16,
       "max_u": 0.5321248641215832,
-      "rel_err_u": 3.818104118133858e-14,
-      "rel_err_energy": 7.732760752865247e-15,
-      "rel_err_reaction": 1.8859522924667253e-14,
+      "rel_err_u": 3.7972401612041644e-14,
+      "rel_err_energy": 6.653770880372423e-15,
+      "rel_err_reaction": 2.3109712954397005e-14,
       "dolfinx_newton_iterations": 20
     }
-  ]
+  ],
+  "negative_control": {
+    "case": "plate_hole/quad4",
+    "perturbation": "second Lame parameter of the reference x 1.001",
+    "rel_err_u": 0.00017425849195978636
+  }
 }
