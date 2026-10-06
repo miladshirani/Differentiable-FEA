@@ -291,6 +291,8 @@ def make_A_operator(u, theta, params):
 #                                             gather -> small batched matmul -> scatter-add
 #                                             ("partial assembly"; no global matrix, but ~128 B of
 #                                             storage per Gauss point)
+#   "qp_ew"      make_A_operator_qp_ew        same as "qp" with element-wise multiply-and-sum instead of
+#                                             batched GEMM (the tiny matrices make GEMM inefficient on GPUs)
 #
 # All three return a closure v -> A(v) with identical semantics (Dirichlet identity pivot included).
 def make_A_operator_linearize(u, theta, params):
@@ -310,14 +312,40 @@ def make_A_operator_linearize(u, theta, params):
     return A
 
 
+def _qp_setup(u, theta, params):
+    """
+    Shared set-up of the stored-tangent operators: the Gauss-point tangent moduli at u.
+
+    Returns (C, dN_dX) with
+        C     (n_el, n_q, 4, 4)  C[e, q, (ij), (kl)] = w_q detJ_q * d^2 psi / (dF_ij dF_kl)   (4x4 matrix per point)
+        dN_dX (n_el, n_q, nen, 2)  cached shape-function gradients
+    The second derivative is computed by autodiff (``hessian`` of the plane-strain energy of the chosen
+    material), vmapped over Gauss points (shared material parameters) and elements.
+    """
+    conn = params["conn"]
+    N = params["nodes"].shape[0]
+    n_el = conn.shape[0]
+    dN_dX, w_detJ = get_geometry(params)                       # (n_el, n_q, nen, 2), (n_el, n_q)
+    n_q = dN_dX.shape[1]
+    element_p = element_material_parameters(theta, params)     # (n_el, n_p)
+    psi_fn = psi_2d(material_of(params)[0])
+
+    # deformation gradient at every Gauss point: F = I + sum_a u_a (x) dN_a/dX      (n_el, n_q, 2, 2)
+    ue = u.reshape(N, 2)[conn]                                 # (n_el, nen, 2)
+    F = torch.eye(2, dtype=u.dtype, device=u.device) + torch.einsum("eai,eqaj->eqij", ue, dN_dX)
+
+    hess = torch.func.hessian(psi_fn, argnums=0)               # (F (2,2), p) -> (2, 2, 2, 2)
+    C = vmap(vmap(hess, in_dims=(0, None)), in_dims=(0, 0))(F, element_p)      # (n_el, n_q, 2, 2, 2, 2)
+    # fold the quadrature weight in and flatten (ij) and (kl) so that C acts as a 4x4 matrix
+    C = (C * w_detJ[:, :, None, None, None, None]).reshape(n_el, n_q, 4, 4)
+    return C, dN_dX
+
+
 def make_A_operator_qp(u, theta, params):
     """
-    Tangent product with the material tangent STORED at the Gauss points.
+    Tangent product with the material tangent STORED at the Gauss points (batched-matmul version).
 
-    At the linearisation point u the second derivative of the energy
-            C[e, q, i, j, k, l] = d^2 psi / (dF_ij dF_kl)            (n_el, n_q, 2, 2, 2, 2)
-    is computed once (autodiff: ``hessian`` of the plane-strain energy of the chosen material), multiplied
-    by the quadrature weight w_q detJ_q, and kept.  One product A(v) is then, per element e and Gauss point q:
+    With C from ``_qp_setup``, one product A(v) is, per element e and Gauss point q:
 
             grad_v   = sum_a v_a (x) dN_a/dX                         gather + einsum   (n_el, n_q, 2, 2)
             dP       = C : grad_v                                    batched 4x4 matvec
@@ -329,25 +357,16 @@ def make_A_operator_qp(u, theta, params):
 
     Memory: 16 numbers per Gauss point (128 B in float64), e.g. 512 B per Q4 element.  Use
     ``make_A_operator_linearize`` when that is too much.
+
+    NOTE (measured on a Tesla T4): the einsum/matmul calls dispatch to cuBLAS batched GEMM with 64x64 tiles
+    for 2x2 / 4x4 matrices, which wastes the GPU; ``make_A_operator_qp_ew`` does the same arithmetic with
+    plain element-wise operations.
     """
     conn, m = params["conn"], params["m"]
     N = params["nodes"].shape[0]
-    n_el, nen = conn.shape
-    dN_dX, w_detJ = get_geometry(params)                       # (n_el, n_q, nen, 2), (n_el, n_q)
+    n_el = conn.shape[0]
+    C, dN_dX = _qp_setup(u, theta, params)
     n_q = dN_dX.shape[1]
-    element_p = element_material_parameters(theta, params)     # (n_el, n_p)
-    psi_fn = psi_2d(material_of(params)[0])
-
-    # deformation gradient at every Gauss point: F = I + sum_a u_a (x) dN_a/dX      (n_el, n_q, 2, 2)
-    ue = u.reshape(N, 2)[conn]                                 # (n_el, nen, 2)
-    F = torch.eye(2, dtype=u.dtype, device=u.device) + torch.einsum("eai,eqaj->eqij", ue, dN_dX)
-
-    # tangent moduli: Hessian of the energy w.r.t. F, vmapped over Gauss points (shared p) and elements
-    hess = torch.func.hessian(psi_fn, argnums=0)               # (F (2,2), p) -> (2, 2, 2, 2)
-    C = vmap(vmap(hess, in_dims=(0, None)), in_dims=(0, 0))(F, element_p)      # (n_el, n_q, 2, 2, 2, 2)
-    # fold the quadrature weight in and flatten (ij) and (kl) so that C acts as a 4x4 matrix
-    C = (C * w_detJ[:, :, None, None, None, None]).reshape(n_el, n_q, 4, 4)
-
     flat_conn = conn.reshape(-1)
 
     def A(v):
@@ -362,7 +381,37 @@ def make_A_operator_qp(u, theta, params):
     return A
 
 
-TANGENT_OPERATORS = ("jvp", "linearize", "qp")
+def make_A_operator_qp_ew(u, theta, params):
+    """
+    The same stored-tangent product as ``make_A_operator_qp`` with every contraction written as an
+    ELEMENT-WISE multiply followed by a sum (broadcasting), so that no batched GEMM (cuBLAS) is called.
+    The matrices are tiny (2x2, 4x4, nen x 2), where a GEMM is dominated by tile padding and launch cost,
+    whereas element-wise kernels are memory-bound.  Same result up to the order of summation (~1e-16).
+
+        dgrad[e,q,i,j] = sum_a  ve[e,a,i] dN[e,q,a,j]
+        dP[e,q,m]      = sum_n  C[e,q,m,n] dgrad[e,q,n]
+        fe[e,a,i]      = sum_{q,j} dP[e,q,i,j] dN[e,q,a,j]
+    """
+    conn, m = params["conn"], params["m"]
+    N = params["nodes"].shape[0]
+    n_el = conn.shape[0]
+    C, dN_dX = _qp_setup(u, theta, params)
+    n_q = dN_dX.shape[1]
+    flat_conn = conn.reshape(-1)
+
+    def A(v):
+        """Jv from the stored moduli, element-wise formulation; v has shape (2N,)."""
+        ve = (m * v).reshape(N, 2)[conn]                                       # (n_el, nen, 2)
+        dgrad = (ve[:, None, :, :, None] * dN_dX[:, :, :, None, :]).sum(2)     # (n_el, n_q, 2, 2)  [i, j]
+        dP = (C * dgrad.reshape(n_el, n_q, 1, 4)).sum(-1).reshape(n_el, n_q, 2, 2)
+        fe = (dP[:, :, None, :, :] * dN_dX[:, :, :, None, :]).sum(dim=(1, 4))  # (n_el, nen, 2)
+        Jv = torch.zeros(N, 2, dtype=v.dtype, device=v.device).index_add_(0, flat_conn, fe.reshape(-1, 2))
+        return m * Jv.reshape(-1) + (1.0 - m) * v
+
+    return A
+
+
+TANGENT_OPERATORS = ("jvp", "linearize", "qp", "qp_ew")
 
 
 def make_tangent_operator(kind, u, theta, params):
@@ -373,6 +422,8 @@ def make_tangent_operator(kind, u, theta, params):
         return make_A_operator_linearize(u, theta, params)
     if kind == "qp":
         return make_A_operator_qp(u, theta, params)
+    if kind == "qp_ew":
+        return make_A_operator_qp_ew(u, theta, params)
     raise ValueError(f"Unknown tangent operator '{kind}'. Choose one of {TANGENT_OPERATORS}.")
 
 

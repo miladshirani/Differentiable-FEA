@@ -36,6 +36,7 @@ from difffea.newton_krylov import newton_krylov_solve
 from profile_matvec import timeit, sync, make_problem            # shared helpers (same folder)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+KINDS = ("jvp", "linearize", "qp", "qp_ew")          # tangent-product evaluations, see operators.py
 
 
 def tension_problem(n_elements, device):
@@ -61,18 +62,17 @@ def matvec_sweep(sizes, device, reps):
             torch.cuda.reset_peak_memory_stats()
         row = dict(n_elements=n_el, n_dofs=int(u.numel()))
         row["residual_s"] = timeit(lambda: global_residual(u, theta, params), device, reps)
-        for kind in ("jvp", "linearize", "qp"):
+        for kind in KINDS:
             if kind == "jvp" and n_el > 400_000 and device == "cpu":
                 continue                                           # too slow to be worth waiting for
             A = make_tangent_operator(kind, u, theta, params)
             row[f"A_{kind}_s"] = timeit(lambda: A(v), device, reps)
-        row["setup_qp_s"] = timeit(lambda: make_tangent_operator("qp", u, theta, params), device, 3)
+        row["setup_qp_s"] = timeit(lambda: make_tangent_operator("qp_ew", u, theta, params), device, 3)
         if str(device).startswith("cuda"):
             row["peak_gpu_MB"] = torch.cuda.max_memory_allocated() / 2 ** 20
         rows.append(row)
         print("  {n_elements:8d} el  R {r:8.2f} ms | A(v): ".format(n_elements=n_el, r=row["residual_s"] * 1e3)
-              + "  ".join(f"{k} {row[f'A_{k}_s'] * 1e3:8.2f} ms" for k in ("jvp", "linearize", "qp")
-                          if f"A_{k}_s" in row), flush=True)
+              + "  ".join(f"{k} {row[f'A_{k}_s'] * 1e3:8.2f} ms" for k in KINDS if f"A_{k}_s" in row), flush=True)
     return rows
 
 
@@ -98,6 +98,8 @@ def main():
     ap.add_argument("--sizes", type=int, nargs="+", default=[2_000, 10_000, 40_000, 160_000])
     ap.add_argument("--solve-elements", type=int, default=10_000)
     ap.add_argument("--reps", type=int, default=7)
+    ap.add_argument("--solve-kinds", nargs="+", default=["jvp", "qp", "qp_ew"], choices=KINDS,
+                    help="tangent evaluations to run a complete solve with (the first is the reference)")
     args = ap.parse_args()
     dev = args.device
     is_cuda = dev.startswith("cuda")
@@ -117,20 +119,24 @@ def main():
 
     print(f"\n--- full solve, {args.solve_elements} Q4 elements, uniaxial tension, Jacobi-CG ---")
     out["solves"], sols = [], {}
-    for tangent in ("jvp", "qp"):
+    for tangent in args.solve_kinds:
         u, stats = solve_case(args.solve_elements, dev, tangent)
         sols[tangent] = u
         out["solves"].append(stats)
         print(f"  {tangent:10s} {stats['seconds']:8.2f} s  converged={stats['converged']}  Newton={stats['newton']}  "
               f"CG={stats['cg']}  |R|={stats['final_residual']:.2e}")
-    out["max_diff_qp_vs_jvp"] = float((sols["qp"] - sols["jvp"]).abs().max() / sols["jvp"].abs().max())
-    print(f"  max relative difference of the two solutions: {out['max_diff_qp_vs_jvp']:.1e}")
+    ref_kind = args.solve_kinds[0]
+    out["max_diff_vs_first"] = {k: float((sols[k] - sols[ref_kind]).abs().max() / sols[ref_kind].abs().max())
+                                for k in args.solve_kinds[1:]}
+    print(f"  max relative solution difference to '{ref_kind}': " +
+          ", ".join(f"{k} {x:.1e}" for k, x in out["max_diff_vs_first"].items()))
 
     if is_cuda:
-        u_cpu, stats = solve_case(args.solve_elements, "cpu", "qp")
+        best = "qp" if "qp" in sols else args.solve_kinds[-1]      # compare like with like on both devices
+        u_cpu, stats = solve_case(args.solve_elements, "cpu", best)
         out["solves"].append(dict(stats, note="CPU reference run on the same machine"))
-        out["max_diff_gpu_vs_cpu"] = float((sols["qp"] - u_cpu).abs().max() / u_cpu.abs().max())
-        print(f"  CPU qp reference: {stats['seconds']:.2f} s; GPU-vs-CPU solution difference "
+        out["max_diff_gpu_vs_cpu"] = float((sols[best] - u_cpu).abs().max() / u_cpu.abs().max())
+        print(f"  CPU {best} reference: {stats['seconds']:.2f} s; GPU-vs-CPU solution difference "
               f"{out['max_diff_gpu_vs_cpu']:.1e}")
         out["peak_gpu_MB_total"] = torch.cuda.max_memory_allocated() / 2 ** 20
 

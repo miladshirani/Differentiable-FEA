@@ -32,7 +32,7 @@ def test_operators_agree_for_every_element(element_type):
     params, theta = small_problem(element_type, h=0.5)
     u, v = _state(params)
     ref = make_tangent_operator("jvp", u, theta, params)(v)
-    for kind in ("linearize", "qp"):
+    for kind in ("linearize", "qp", "qp_ew"):
         assert _rel(make_tangent_operator(kind, u, theta, params)(v), ref) < 1e-11, kind
 
 
@@ -41,7 +41,7 @@ def test_operators_agree_for_every_material(material):
     params, theta = small_problem("quad4", material=material, h=1.0)
     u, v = _state(params, seed=1)
     ref = make_tangent_operator("jvp", u, theta, params)(v)
-    for kind in ("linearize", "qp"):
+    for kind in ("linearize", "qp", "qp_ew"):
         assert _rel(make_tangent_operator(kind, u, theta, params)(v), ref) < 1e-10, kind
 
 
@@ -50,7 +50,7 @@ def test_operators_respect_nonuniform_theta():
     theta = 0.5 + torch.rand(theta.shape[0], dtype=DTYPE, generator=torch.Generator().manual_seed(2))
     u, v = _state(params, seed=3)
     ref = make_tangent_operator("jvp", u, theta, params)(v)
-    assert _rel(make_tangent_operator("qp", u, theta, params)(v), ref) < 1e-11
+    assert _rel(make_tangent_operator("qp_ew", u, theta, params)(v), ref) < 1e-11
 
 
 @pytest.mark.parametrize("kind", TANGENT_OPERATORS)
@@ -69,7 +69,7 @@ def test_unknown_operator_name_is_rejected():
         make_tangent_operator("nope", u, theta, params)
 
 
-@pytest.mark.parametrize("kind", ["linearize", "qp"])
+@pytest.mark.parametrize("kind", ["linearize", "qp", "qp_ew"])
 def test_solver_reaches_the_same_solution(kind):
     params, theta = small_problem("quad9", load=(0.0, -40.0), h=0.5)
     tol = 1e-9 * float(torch.norm(params["f"]))

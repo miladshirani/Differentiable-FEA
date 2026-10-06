@@ -38,6 +38,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
+      - name: System libraries that the Gmsh wheel links against
+        run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libxrender1 libxcursor1 libxft2 libxinerama1 libfontconfig1
       - name: Install (CPU torch at the pinned version, then the rest)
         run: |
           python -m pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu

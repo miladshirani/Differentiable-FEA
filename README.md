@@ -55,8 +55,27 @@ Apple-silicon laptop, 6 threads, float64, Q4 elements. Source: `benchmarks/bench
   element-wise operations, not into arithmetic. `qp` reaches about 3 %.
 * **On this CPU, in 2D, an assembled sparse matrix is still about 10x faster per product than the best matrix-free
   variant.** Matrix-free is expected to pay off for high-order elements, 3D and on GPUs (memory), not here;
-  that has to be measured, and has not been yet.
-* **GPU: not measured.** `notebooks/colab_gpu.ipynb` runs the same scripts on a Colab T4; results will be added when they exist.
+  that has to be measured, and has only been started (see the GPU section).
+### First GPU measurement (free Colab T4, float64, two runs)
+
+Source: `benchmarks/results/bench_cuda_t4_colab.json`, `bench_cpu_colab.json`, `profile_cuda_quad4.json` (the Colab CPU
+has **one** thread, so GPU-vs-CPU ratios against it say little about a modern multi-core CPU).
+
+| Q4, uniaxial tension | Colab CPU (1 thread) | T4 GPU | laptop CPU (6 threads, from above) |
+|---|---|---|---|
+| tangent product `qp`, 40k elements | 46-73 ms | 14.8 ms (both runs) | 5.6 ms |
+| tangent product `qp`, 160k elements | 184-285 ms | 59 ms (both runs) | 23 ms |
+| complete solve, 10k elements, `qp` | 45-49 s | 12.4-12.7 s | 11.0 s |
+| complete solve, 10k elements, `jvp` | 201-211 s | 43-45 s | 72.2 s |
+
+* **The CUDA path works**: the same solve on GPU and CPU agrees to 1e-12 (relative, max norm).
+* **The T4 is not faster than the laptop CPU here.** The tangent product reaches 0.68 % of the T4's measured memory
+  bandwidth (233 GB/s) and its time grows linearly with the mesh, so it is throughput-limited, not launch-limited.
+* The profile of the reference `jvp` operator on the T4 puts 74 % of the time into cuBLAS batched double-precision GEMM
+  (`volta_dgemm_64x64`) applied to 2x2 / 4x4 matrices: a bad fit. The `qp` operator uses the same kind of batched calls;
+  `qp_ew` (same arithmetic with element-wise multiply-and-sum) was added to test that explanation and has **not yet been
+  measured on a GPU**. On the CPU it is slower than `qp` (12 vs 5 ms at 40k elements).
+* GPU memory: peak 3.9 GB at 160k elements over all operators together (not attributed per operator).
 
 ## Design rules
 

@@ -24,3 +24,6 @@
 12. `torch.func.linearize` prints a harmless `get_attr Node` UserWarning (inside PyTorch).
 13. The tangent moduli stored by the default `qp` operator take about 128 bytes per Gauss point (512 B per Q4 element);
     use `tangent="linearize"` or `"jvp"` if memory is tight. GPU memory use has not been measured yet.
+14. The Gmsh wheel needs the system library `libGLU.so.1`. Colab does not have it (Gmsh meshing fails there with
+    `OSError: libGLU.so.1`), so the Colab notebook uses the structured mesher. On Ubuntu: `sudo apt-get install libglu1-mesa`.
+    The CI workflow installs it, but that workflow has not run yet.

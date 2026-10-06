@@ -32,8 +32,8 @@ from torch.func import linearize
 
 import difffea
 from difffea.problem import default_spec, build_problem
-from difffea.operators import (global_residual, make_A_operator, make_A_operator_qp, make_AT_operator,
-                               compute_jacobi_diagonal, assemble_tangent_sparse)
+from difffea.operators import (global_residual, make_A_operator, make_A_operator_qp, make_A_operator_qp_ew,
+                               make_AT_operator, compute_jacobi_diagonal, assemble_tangent_sparse)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -99,7 +99,7 @@ def min_traffic_bytes(params):
     return geom + conn + gathered + scattered + globals_
 
 
-def profile_table(fn, device, top=10):
+def profile_table(fn, device, top=8):
     """Run ``fn`` under torch.profiler and return the ``top`` operators by self time as dict rows."""
     from torch.profiler import profile, ProfilerActivity
     on_gpu = str(device).startswith("cuda")
@@ -140,6 +140,7 @@ def main():
     AT = make_AT_operator(u, theta, params)
     _, jvp_fn = linearize(lambda w: global_residual(w, theta, params), u)       # primal evaluated once
     A_qp = make_A_operator_qp(u, theta, params)                                 # tangent stored at Gauss points
+    A_ew = make_A_operator_qp_ew(u, theta, params)                              # same, element-wise formulation
     m = params["m"]
 
     t = {}
@@ -147,6 +148,7 @@ def main():
     t["A(v) = jvp (current)"] = timeit(lambda: A(v), dev, args.reps)
     t["A(v) via linearize (primal cached)"] = timeit(lambda: m * jvp_fn(m * v) + (1.0 - m) * v, dev, args.reps)
     t["A(v) stored Gauss-point tangent (qp)"] = timeit(lambda: A_qp(v), dev, args.reps)
+    t["A(v) stored tangent, element-wise (qp_ew)"] = timeit(lambda: A_ew(v), dev, args.reps)
     # one-off cost per Newton iteration (paid once, then amortised over all CG iterations)
     t["setup: linearize"] = timeit(lambda: linearize(lambda w: global_residual(w, theta, params), u), dev, 3)
     t["setup: qp (moduli at Gauss points)"] = timeit(lambda: make_A_operator_qp(u, theta, params), dev, 3)
@@ -155,11 +157,12 @@ def main():
                                                          max(3, args.reps // 3))
     err = float((A(v) - (m * jvp_fn(m * v) + (1.0 - m) * v)).abs().max() / A(v).abs().max())
     err_qp = float((A(v) - A_qp(v)).abs().max() / A(v).abs().max())
+    err_ew = float((A(v) - A_ew(v)).abs().max() / A(v).abs().max())
 
     out = dict(difffea=difffea.__version__, torch=torch.__version__, platform=platform.platform(),
                python=platform.python_version(), device=dev, threads=torch.get_num_threads(),
                element_type=args.element_type, n_elements=n_el, n_dofs=n_dof,
-               seconds={k: float(x) for k, x in t.items()}, linearize_vs_jvp_rel_diff=err, qp_vs_jvp_rel_diff=err_qp)
+               seconds={k: float(x) for k, x in t.items()}, linearize_vs_jvp_rel_diff=err, qp_vs_jvp_rel_diff=err_qp, qp_ew_vs_jvp_rel_diff=err_ew)
     if str(dev).startswith("cuda"):
         out["gpu"] = torch.cuda.get_device_name(0)
         out["peak_memory_MB"] = torch.cuda.max_memory_allocated() / 2 ** 20
@@ -186,13 +189,14 @@ def main():
     out["fraction_of_bandwidth_current"] = t_ideal / t["A(v) = jvp (current)"]
     out["fraction_of_bandwidth_linearize"] = t_ideal / t["A(v) via linearize (primal cached)"]
     out["fraction_of_bandwidth_qp"] = t_ideal / t["A(v) stored Gauss-point tangent (qp)"]
+    out["fraction_of_bandwidth_qp_ew"] = t_ideal / t["A(v) stored tangent, element-wise (qp_ew)"]
     out["qp_storage_MB"] = n_el * params["dN_dX"].shape[1] * 16 * 8 / 2 ** 20
 
     # ---- print ----------------------------------------------------------------------------------
     print("\n--- wall time (median of runs) ---")
     for k, x in t.items():
         print(f"{k:42s} {x * 1e3:10.2f} ms")
-    print(f"max rel. difference of the result vs jvp: linearize {err:.1e}, qp {err_qp:.1e}")
+    print(f"max rel. difference of the result vs jvp: linearize {err:.1e}, qp {err_qp:.1e}, qp_ew {err_ew:.1e}")
     if "assembled" in out:
         a = out["assembled"]
         print(f"assembled: assembly {a['assembly_s'] * 1e3:.0f} ms, CSR matvec {a['spmv_s'] * 1e3:.2f} ms, "
@@ -201,7 +205,8 @@ def main():
           f"{out['min_traffic_MB_per_matvec']:.1f} MB -> ideal {t_ideal * 1e3:.3f} ms; "
           f"fraction of that reached: jvp {100 * out['fraction_of_bandwidth_current']:.2f} %, "
           f"linearize {100 * out['fraction_of_bandwidth_linearize']:.2f} %, "
-          f"qp {100 * out['fraction_of_bandwidth_qp']:.2f} % (stores {out['qp_storage_MB']:.0f} MB)")
+          f"qp {100 * out['fraction_of_bandwidth_qp']:.2f} %, qp_ew {100 * out['fraction_of_bandwidth_qp_ew']:.2f} % "
+          f"(both store {out['qp_storage_MB']:.0f} MB)")
     os.makedirs(os.path.join(HERE, "results"), exist_ok=True)
     path = os.path.join(HERE, "results", f"profile_{dev.split(':')[0]}_{args.element_type}.json")
 
@@ -212,14 +217,17 @@ def main():
     save()                                  # the timings are safe on disk before the profiler (which can fail) runs
 
     # ---- operator-level profile (last: it depends on the PyTorch version) -------------------------
-    print("\n--- torch.profiler, top operators of A(v) (self time) ---")
-    try:
-        out["profile_A_v_top_ops"] = profile_table(lambda: A(v), dev)
-        for r in out["profile_A_v_top_ops"]:
-            print(f"{r['percent']:6.1f} %  {r['ms_per_call_total']:9.2f} ms  x{r['calls']:<4d} {r['op']}")
-    except Exception as exc:                # noqa: BLE001 -- report and keep the measurements
-        out["profile_error"] = f"{type(exc).__name__}: {exc}"
-        print("profiler failed (timings above are still valid):", out["profile_error"])
+    out["profile_top_ops"] = {}
+    for name, op in (("jvp", A), ("qp", A_qp), ("qp_ew", A_ew)):
+        print(f"\n--- torch.profiler, top operators of A(v) [{name}] (self time per product) ---")
+        try:
+            rows = profile_table(lambda op=op: op(v), dev)
+            out["profile_top_ops"][name] = rows
+            for r in rows:
+                print(f"{r['percent']:6.1f} %  {r['ms_per_call_total']:9.2f} ms  x{r['calls']:<4d} {r['op'][:90]}")
+        except Exception as exc:            # noqa: BLE001 -- report and keep the measurements
+            out["profile_top_ops"][name] = f"{type(exc).__name__}: {exc}"
+            print("profiler failed (timings above are still valid):", out["profile_top_ops"][name])
     save()
     print("\nwrote", os.path.relpath(path, os.path.dirname(HERE)))
     print("\nJSON (copy this block when reporting results):")
